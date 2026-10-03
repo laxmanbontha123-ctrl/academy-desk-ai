@@ -31,6 +31,9 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [serverAuthResult, setServerAuthResult] = useState("");
+  const [serverAuthError, setServerAuthError] = useState("");
+  const [testingServerAuth, setTestingServerAuth] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,6 +53,41 @@ export default function Home() {
     }
   }
 
+  async function testServerAuth() {
+    setServerAuthError("");
+    setServerAuthResult("");
+    setTestingServerAuth(true);
+
+    try {
+      const token = await user?.getIdToken(true);
+
+      if (!token) {
+        throw new Error("You must be signed in to test server authentication.");
+      }
+
+      const response = await fetch("/api/whoami", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const result = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Server authentication failed.");
+      }
+
+      setServerAuthResult(JSON.stringify(result, null, 2));
+    } catch (serverError) {
+      setServerAuthError(
+        serverError instanceof Error
+          ? serverError.message
+          : "Server authentication failed.",
+      );
+    } finally {
+      setTestingServerAuth(false);
+    }
+  }
+
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
   }
@@ -60,6 +98,22 @@ export default function Home() {
         <section className="w-full max-w-md space-y-4 rounded-lg border p-6">
           <h1 className="text-2xl font-semibold">AcademyDesk AI</h1>
           <p>Signed in as {user.email}</p>
+          <button
+            className="rounded-md border px-4 py-2"
+            disabled={testingServerAuth}
+            onClick={testServerAuth}
+            type="button"
+          >
+            {testingServerAuth ? "Testing..." : "Test server auth"}
+          </button>
+          {serverAuthResult && (
+            <pre className="overflow-auto rounded-md bg-zinc-100 p-3 text-sm">
+              {serverAuthResult}
+            </pre>
+          )}
+          {serverAuthError && (
+            <p className="text-sm text-red-600">{serverAuthError}</p>
+          )}
           <button
             className="rounded-md bg-black px-4 py-2 text-white"
             onClick={() => logout().catch((logoutError) => {
