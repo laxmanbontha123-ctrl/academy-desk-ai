@@ -42,6 +42,16 @@ function isDecodedIdToken(value: DecodedIdToken): value is DecodedIdToken {
   return typeof value.uid === "string" && value.uid.length > 0;
 }
 
+function isFirebaseAuthError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code.startsWith("auth/")
+  );
+}
+
 export async function requireUser(
   request: Request,
 ): Promise<AuthenticatedUser> {
@@ -54,11 +64,19 @@ export async function requireUser(
       throw error;
     }
 
-    throw new ApiError(401, "Authentication is required.");
+    throw new ApiError(
+      isFirebaseAuthError(error) ? 401 : 500,
+      isFirebaseAuthError(error)
+        ? "Authentication is required."
+        : "Server authentication is temporarily unavailable.",
+    );
   }
 
   if (!isDecodedIdToken(decodedToken)) {
-    throw new ApiError(401, "Authentication is required.");
+    throw new ApiError(
+      500,
+      "Server authentication is temporarily unavailable.",
+    );
   }
 
   try {
@@ -90,7 +108,10 @@ export async function requireUser(
       throw error;
     }
 
-    throw new ApiError(500, "Unable to load your user profile.");
+    throw new ApiError(
+      500,
+      "Server authentication is temporarily unavailable.",
+    );
   }
 }
 
