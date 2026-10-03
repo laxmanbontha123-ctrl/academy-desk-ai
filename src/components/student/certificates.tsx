@@ -1,0 +1,13 @@
+"use client";
+
+import { useState } from "react";
+import { formatDate } from "@/lib/format";
+import { statusLabel, statusTone } from "@/lib/labels";
+import type { Course, Enrollment, UserProfile } from "@/types/academy";
+import { Badge, Card, EmptyState, SectionHeading, Skeleton } from "./ui";
+
+export function Certificates({ enrollments, courses, profile, loading }: { enrollments: Enrollment[]; courses: Course[]; profile: UserProfile | null; loading: boolean }) {
+  const [selected, setSelected] = useState<Enrollment | null>(null);
+  if (loading) return <><SectionHeading title="Certificates" /><Skeleton className="h-48" /></>;
+  return <div><SectionHeading title="Certificates" detail="Your course completion milestones." />{!enrollments.length ? <EmptyState title="No certificates yet" /> : <div className="grid gap-4 md:grid-cols-2">{enrollments.map((item) => <Card key={item.id}><div className="flex items-center justify-between"><h3 className="font-black text-white">{courses.find((course) => course.id === item.courseId)?.title ?? item.courseTitle ?? "Course"}</h3><Badge tone={statusTone(item.certificateStatus)}>{statusLabel(item.certificateStatus)}</Badge></div>{item.certificateStatus === "issued" ? <button onClick={() => setSelected(item)} className="mt-5 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">View certificate</button> : <p className="mt-4 text-sm text-slate-400">{item.certificateStatus === "eligible" ? "Your certificate is ready to be issued." : "Complete the course requirements to become eligible."}</p>}</Card>)}</div>}{selected && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/80 p-5"><div className="w-full max-w-xl rounded-3xl bg-white p-8 text-center text-slate-950"><p className="text-xs font-bold uppercase tracking-widest text-blue-600">AcademyDesk AI</p><h3 className="mt-6 text-3xl font-black">Certificate of Completion</h3><p className="mt-8 text-sm">This certifies that</p><p className="mt-2 text-2xl font-black">{profile?.name ?? "Student"}</p><p className="mt-6 text-sm">has completed</p><p className="mt-2 text-xl font-bold">{courses.find((course) => course.id === selected.courseId)?.title ?? selected.courseTitle ?? "Academy course"}</p><p className="mt-8 text-sm text-slate-500">{formatDate(selected.enrolledAt)}</p><div className="mt-8 flex justify-center gap-3"><button onClick={() => window.print()} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white">Print</button><button onClick={() => setSelected(null)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold">Close</button></div></div></div>}</div>;
+}

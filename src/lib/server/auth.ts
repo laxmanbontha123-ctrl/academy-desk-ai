@@ -1,4 +1,4 @@
-import { DecodedIdToken } from "firebase-admin/auth";
+﻿import { DecodedIdToken } from "firebase-admin/auth";
 import { adminAuth, adminDb } from "./firebase-admin";
 
 type UserProfile = {
@@ -70,13 +70,20 @@ function logServerFailure(prefix: string, error: unknown) {
   console.error(prefix, details);
 }
 
-export async function requireUser(
+export async function verifyBearerToken(
   request: Request,
-): Promise<AuthenticatedUser> {
-  let decodedToken: DecodedIdToken;
-
+): Promise<DecodedIdToken> {
   try {
-    decodedToken = await adminAuth.verifyIdToken(getBearerToken(request));
+    const decodedToken = await adminAuth.verifyIdToken(getBearerToken(request));
+
+    if (!isDecodedIdToken(decodedToken)) {
+      throw new ApiError(
+        500,
+        "Server authentication is temporarily unavailable.",
+      );
+    }
+
+    return decodedToken;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
@@ -89,13 +96,12 @@ export async function requireUser(
     logServerFailure("[auth] server verification failure", error);
     throw new ApiError(500, "Server authentication is temporarily unavailable.");
   }
+}
 
-  if (!isDecodedIdToken(decodedToken)) {
-    throw new ApiError(
-      500,
-      "Server authentication is temporarily unavailable.",
-    );
-  }
+export async function requireUser(
+  request: Request,
+): Promise<AuthenticatedUser> {
+  const decodedToken = await verifyBearerToken(request);
 
   try {
     const profileSnapshot = await adminDb
@@ -126,7 +132,7 @@ export async function requireUser(
       throw error;
     }
 
-    logServerFailure("[auth] profile load failure", error);
+    console.error("[auth] profile load failure detail", error);
     throw new ApiError(500, "Server authentication is temporarily unavailable.");
   }
 }
@@ -142,3 +148,5 @@ export async function requireAdmin(
 
   return authenticatedUser;
 }
+
+
