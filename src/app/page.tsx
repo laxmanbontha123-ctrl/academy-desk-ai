@@ -1,69 +1,146 @@
-import Image from "next/image";
+"use client";
+
+import { FirebaseError } from "firebase/app";
+import { FormEvent, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+
+function getAuthErrorMessage(error: unknown) {
+  if (!(error instanceof FirebaseError)) {
+    return "Something went wrong. Please try again.";
+  }
+
+  switch (error.code) {
+    case "auth/email-already-in-use":
+      return "An account already exists for this email.";
+    case "auth/invalid-credential":
+    case "auth/invalid-email":
+    case "auth/user-disabled":
+      return "The email or password is invalid.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    default:
+      return "Authentication failed. Please try again.";
+  }
+}
 
 export default function Home() {
+  const { user, loading, login, register, logout } = useAuth();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+
+    try {
+      if (mode === "register") {
+        await register(name.trim(), email.trim(), password);
+      } else {
+        await login(email.trim(), password);
+      }
+    } catch (authError) {
+      setError(getAuthErrorMessage(authError));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return <main className="flex min-h-screen items-center justify-center">Loading...</main>;
+  }
+
+  if (user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <section className="w-full max-w-md space-y-4 rounded-lg border p-6">
+          <h1 className="text-2xl font-semibold">AcademyDesk AI</h1>
+          <p>Signed in as {user.email}</p>
+          <button
+            className="rounded-md bg-black px-4 py-2 text-white"
+            onClick={() => logout().catch((logoutError) => {
+              setError(getAuthErrorMessage(logoutError));
+            })}
+            type="button"
+          >
+            Log out
+          </button>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </section>
+      </main>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="flex min-h-screen items-center justify-center p-6">
+      <section className="w-full max-w-md space-y-4 rounded-lg border p-6">
+        <div>
+          <h1 className="text-2xl font-semibold">AcademyDesk AI</h1>
+          <p className="text-sm text-zinc-600">
+            {mode === "login" ? "Sign in to continue." : "Create a student account."}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          {mode === "register" && (
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Name</span>
+              <input
+                className="w-full rounded-md border px-3 py-2"
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Email</span>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              required
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Password</span>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              minLength={6}
+              required
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button
+            className="w-full rounded-md bg-black px-4 py-2 text-white disabled:opacity-50"
+            disabled={submitting}
+            type="submit"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {submitting ? "Please wait..." : mode === "login" ? "Log in" : "Register"}
+          </button>
+        </form>
+
+        <button
+          className="text-sm underline"
+          onClick={() => {
+            setMode(mode === "login" ? "register" : "login");
+            setError("");
+          }}
+          type="button"
+        >
+          {mode === "login"
+            ? "Need an account? Register"
+            : "Already have an account? Log in"}
+        </button>
+      </section>
+    </main>
   );
 }

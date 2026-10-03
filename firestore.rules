@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isActiveUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "active";
+    }
+
+    function isOwner(uid) {
+      return isActiveUser() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isActiveUser()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /users/{uid} {
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.role == "student"
+          && request.resource.data.status == "active");
+      allow read: if isAdmin()
+        || (signedIn() && request.auth.uid == uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    match /classes/{classId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    match /internships/{internshipId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow create: if isAdmin()
+        || (isOwner(request.resource.data.uid)
+          && request.resource.data.keys().hasOnly([
+            "uid",
+            "courseId",
+            "courseTitle",
+            "status",
+            "enrolledAt",
+            "progressPercent",
+            "attendedClasses",
+            "totalClasses",
+            "certificateStatus"
+          ])
+          && request.resource.data.status == "active"
+          && request.resource.data.progressPercent == 0
+          && request.resource.data.attendedClasses == 0
+          && request.resource.data.certificateStatus == "not_eligible"
+          && request.resource.data.enrolledAt == request.time
+          && exists(/databases/$(database)/documents/courses/$(request.resource.data.courseId)));
+      allow read: if isAdmin() || isOwner(resource.data.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow create: if isAdmin();
+      allow read: if isAdmin() || isOwner(resource.data.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /tickets/{ticketId} {
+      allow create: if isAdmin();
+      allow read: if isAdmin() || isOwner(resource.data.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /insights/{insightId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
