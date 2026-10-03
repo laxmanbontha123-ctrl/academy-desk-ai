@@ -52,6 +52,24 @@ function isFirebaseAuthError(error: unknown): boolean {
   );
 }
 
+function logServerFailure(prefix: string, error: unknown) {
+  const details =
+    typeof error === "object" && error !== null
+      ? {
+          name:
+            "name" in error && typeof error.name === "string"
+              ? error.name
+              : undefined,
+          code:
+            "code" in error && typeof error.code === "string"
+              ? error.code
+              : undefined,
+        }
+      : {};
+
+  console.error(prefix, details);
+}
+
 export async function requireUser(
   request: Request,
 ): Promise<AuthenticatedUser> {
@@ -64,12 +82,12 @@ export async function requireUser(
       throw error;
     }
 
-    throw new ApiError(
-      isFirebaseAuthError(error) ? 401 : 500,
-      isFirebaseAuthError(error)
-        ? "Authentication is required."
-        : "Server authentication is temporarily unavailable.",
-    );
+    if (isFirebaseAuthError(error)) {
+      throw new ApiError(401, "Authentication is required.");
+    }
+
+    logServerFailure("[auth] server verification failure", error);
+    throw new ApiError(500, "Server authentication is temporarily unavailable.");
   }
 
   if (!isDecodedIdToken(decodedToken)) {
@@ -108,10 +126,8 @@ export async function requireUser(
       throw error;
     }
 
-    throw new ApiError(
-      500,
-      "Server authentication is temporarily unavailable.",
-    );
+    logServerFailure("[auth] profile load failure", error);
+    throw new ApiError(500, "Server authentication is temporarily unavailable.");
   }
 }
 

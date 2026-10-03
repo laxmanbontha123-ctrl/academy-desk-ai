@@ -1,13 +1,11 @@
-"use client";
+﻿"use client";
 
 import {
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   createContext,
   useContext,
@@ -16,13 +14,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { auth, db } from "./firebase";
+import { auth } from "./firebase";
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  sendEmailOtp: (email: string) => Promise<void>;
+  verifyEmailOtp: (email: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -43,26 +41,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       loading,
-      async register(name, email, password) {
-        const credential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password,
-        );
 
-        await setDoc(doc(db, "users", credential.user.uid), {
-          name,
-          email: credential.user.email,
-          role: "student",
-          status: "active",
-          createdAt: serverTimestamp(),
+      async sendEmailOtp(email) {
+        const response = await fetch("/api/auth/email-otp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "send",
+            email: email.trim().toLowerCase(),
+          }),
         });
+
+        const result = (await response.json()) as { error?: string };
+
+        if (!response.ok) {
+          throw new Error(result.error ?? "Unable to send verification code.");
+        }
       },
-      login(email, password) {
-        return signInWithEmailAndPassword(auth, email, password).then(
-          () => undefined,
-        );
+
+      async verifyEmailOtp(email, code) {
+        const response = await fetch("/api/auth/email-otp", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "verify",
+            email: email.trim().toLowerCase(),
+            code: code.trim(),
+          }),
+        });
+
+        const result = (await response.json()) as {
+          token?: string;
+          user?: {
+            uid: string;
+            email: string | null;
+            name: string;
+          };
+          error?: string;
+        };
+
+        if (!response.ok || !result.token) {
+          throw new Error(result.error ?? "Unable to verify the code.");
+        }
+
+        await signInWithCustomToken(auth, result.token);
       },
+
       logout() {
         return signOut(auth);
       },
