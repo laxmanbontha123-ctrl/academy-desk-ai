@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/server/firebase-admin";
+import { adminAuth } from "@/lib/server/firebase-admin";
 
 export const runtime = "nodejs";
 
@@ -19,24 +19,6 @@ export async function POST() {
     }
 
     const firebaseUser = await adminAuth.getUserByPhoneNumber(phoneNumber);
-    const profileRef = adminDb.collection("users").doc(firebaseUser.uid);
-    const profileSnapshot = await profileRef.get();
-
-    if (!profileSnapshot.exists) {
-      return NextResponse.json(
-        { error: "Demo student profile is not configured." },
-        { status: 500 },
-      );
-    }
-
-    const profile = profileSnapshot.data();
-
-    if (profile?.role !== "student" || profile?.status !== "active") {
-      return NextResponse.json(
-        { error: "Demo student account is unavailable." },
-        { status: 403 },
-      );
-    }
 
     const token = await adminAuth.createCustomToken(firebaseUser.uid, {
       role: "student",
