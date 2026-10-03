@@ -21,9 +21,13 @@ function getAdminApp() {
 
   return initializeApp({
     credential: cert({
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, "\n"),
+      projectId: projectId.trim(),
+      clientEmail: clientEmail.trim(),
+      privateKey: privateKey
+        .trim()
+        .replace(/^['"]|['"]$/g, "")
+        .replace(/\\r?\\n/g, "\n")
+        .replace(/\r\n/g, "\n"),
     }),
   });
 }
